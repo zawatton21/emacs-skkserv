@@ -5,6 +5,8 @@
 A full skkserv implementation in Emacs Lisp with Google IME and MeCab backends.
 #+end_quote
 
+[[https://github.com/sponsors/zawatton21][https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?style=flat-square]]
+
 * What is this?
 
 emacs-skkserv is an SKK dictionary server that runs inside Emacs.
