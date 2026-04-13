@@ -67,8 +67,45 @@ All three backends run concurrently.  When a query arrives:
 
 * Installation
 
+** async-installer
+
 #+begin_src emacs-lisp
-(add-to-list 'load-path "~/Projects/emacs-skkserv")
+(async-installer-github-add "https://github.com/zawatton21/emacs-skkserv.git"
+                            :branch "master"
+                            :main "emacs-skkserv.el")
+#+end_src
+
+** straight.el
+
+#+begin_src emacs-lisp
+(straight-use-package
+ '(emacs-skkserv :type git :host github :repo "zawatton21/emacs-skkserv"))
+#+end_src
+
+** elpaca
+
+#+begin_src emacs-lisp
+(elpaca (emacs-skkserv :host github :repo "zawatton21/emacs-skkserv"))
+#+end_src
+
+** use-package (with straight or elpaca)
+
+#+begin_src emacs-lisp
+;; with straight
+(use-package emacs-skkserv
+  :straight (emacs-skkserv :type git :host github :repo "zawatton21/emacs-skkserv"))
+
+;; with elpaca
+(use-package emacs-skkserv
+  :ensure (:host github :repo "zawatton21/emacs-skkserv"))
+#+end_src
+
+** Manual
+
+Clone this repository and add it to your =load-path=:
+
+#+begin_src emacs-lisp
+(add-to-list 'load-path "/path/to/emacs-skkserv")
 (require 'emacs-skkserv)
 #+end_src
 
