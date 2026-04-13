@@ -69,6 +69,8 @@ All three backends run concurrently.  When a query arrives:
 
 ** async-installer
 
+[[https://github.com/zawatton21/async-installer][async-installer]] — non-blocking GitHub package installer for Emacs.
+
 #+begin_src emacs-lisp
 (async-installer-github-add "https://github.com/zawatton21/emacs-skkserv.git"
                             :branch "master"
