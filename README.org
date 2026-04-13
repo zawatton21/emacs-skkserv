@@ -72,7 +72,7 @@ All three backends run concurrently.  When a query arrives:
 [[https://github.com/zawatton21/async-installer][async-installer]] — a small, non-blocking package manager for Emacs. Pure Elisp syntax — no macro DSL required.
 
 #+begin_src emacs-lisp
-(async-installer-github-add "https://github.com/zawatton21/emacs-skkserv.git"
+(async-installer-git-add "https://github.com/zawatton21/emacs-skkserv.git"
                             :branch "master"
                             :main "emacs-skkserv.el")
 #+end_src
