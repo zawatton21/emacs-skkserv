@@ -1,0 +1,254 @@
+#+title: emacs-skkserv — SKK dictionary server in Emacs Lisp
+#+author: Fujisawa Electric Management Office
+
+#+begin_quote
+A full skkserv implementation in Emacs Lisp with Google IME and MeCab backends.
+#+end_quote
+
+* What is this?
+
+emacs-skkserv is an SKK dictionary server that runs inside Emacs.
+It speaks the standard skkserv protocol on port 1178, so any SKK
+client can connect:
+
+- *ddskk* (Emacs built-in SKK)
+- *CorvusSKK* (Windows system-wide SKK)
+- *ibus-skk* (Linux IBus SKK)
+
+Unlike standalone skkserv implementations (yaskkserv, skkserv),
+emacs-skkserv runs as Emacs network processes — no external daemon
+to manage.
+
+* Architecture
+
+#+begin_example
+  SKK clients (ddskk / CorvusSKK / ibus-skk)
+       │
+       │  skkserv protocol (port 1178)
+       ▼
+  ┌─────────────────────┐
+  │  skk-async-server   │  ← skkserv protocol handler
+  │  (trie cache)       │
+  └─────┬───┬───┬───────┘
+        │   │   │
+   ┌────┘   │   └────┐
+   ▼        ▼        ▼
+ Dictionary  Google   MeCab
+ Server      IME      Server
+ (port       Server   (port
+  54000)    (port      56000)
+             55000)
+#+end_example
+
+All three backends run concurrently.  When a query arrives:
+
+1. Dictionary server checks local SKK dictionary files first
+2. Google IME and MeCab race in parallel (when online)
+3. Results are merged and returned to the client
+
+* Features
+
+| Feature | Description |
+|---------+-------------|
+| skkserv protocol | Standard protocol, any SKK client works |
+| Multiple dictionary formats | Plain text, CDB, SQLite |
+| Trie cache | In-memory trie for sub-millisecond lookups |
+| Google IME fallback | Online transliteration with persistent disk cache |
+| MeCab integration | Morphological analysis for compound words |
+| Online-aware | Graceful offline fallback (dictionary-only mode) |
+| Async I/O | Non-blocking network processes, no Emacs freeze |
+
+* Requirements
+
+- Emacs 27.1+
+- [[https://melpa.org/#/async][async.el]]
+- SKK dictionary file (see [[*SKK dictionary setup][SKK dictionary setup]])
+- MeCab (optional, see [[*MeCab setup][MeCab setup]])
+
+* Installation
+
+#+begin_src emacs-lisp
+(add-to-list 'load-path "~/Projects/emacs-skkserv")
+(require 'emacs-skkserv)
+#+end_src
+
+* SKK dictionary setup
+
+emacs-skkserv needs at least one SKK dictionary file.  The most
+common choice is =SKK-JISYO.L= (large dictionary, ~170k entries).
+
+** Download
+
+#+begin_src sh
+# Download from SKK OpenLab
+curl -O https://skk-dev.github.io/dict/SKK-JISYO.L.gz
+gunzip SKK-JISYO.L.gz
+#+end_src
+
+The standard distribution is EUC-JP encoded.  Convert to UTF-8:
+
+#+begin_src sh
+iconv -f EUC-JP -t UTF-8 SKK-JISYO.L > SKK-JISYO.L.utf8
+#+end_src
+
+Place the file in a convenient location (e.g. =~/.emacs.d/ddskk/=).
+
+** Supported dictionary formats
+
+| Format | Extension | Description |
+|--------+-----------+-------------|
+| Plain text | =.utf8= | Standard SKK dictionary format. No extra tools needed. |
+| CDB | =.cdb= | Constant Database. Faster lookup for large dictionaries. |
+| SQLite | =.db= | SQLite3 database. Supports complex queries. |
+
+** Configuration
+
+#+begin_src emacs-lisp
+(setq dictionary-server-host "127.0.0.1")
+(setq dictionary-server-port 54000)
+(setq skk-async-dictionaries
+      `(;; Plain text dictionary
+        (:file ,(expand-file-name "~/.emacs.d/ddskk/SKK-JISYO.L.utf8")
+               :type plain :coding utf-8)
+        ;; User dictionary (optional)
+        (:file ,(expand-file-name "~/.emacs.d/ddskk/SKK-MY-JISYO.utf8")
+               :type plain :coding utf-8)))
+(dictionary-server-start)
+#+end_src
+
+* MeCab setup
+
+MeCab provides morphological analysis for compound word conversion.
+It is optional — emacs-skkserv works without it (dictionary +
+Google IME only).
+
+** Install MeCab
+
+*** Linux (Debian / Ubuntu / WSL)
+
+#+begin_src sh
+sudo apt install mecab libmecab-dev mecab-ipadic-utf8
+#+end_src
+
+Reference: [[https://zenn.dev/splusl_at/articles/mecab-install-wsl][WSLのUbuntuにMeCabをインストールする]]
+
+*** macOS
+
+#+begin_src sh
+brew install mecab mecab-ipadic
+#+end_src
+
+Reference: [[https://shishimaro.co.jp/blog/ai/489][MacでMeCabのPython開発環境を構築する]]
+
+*** Windows
+
+Use the 64-bit unofficial build:
+
+- [[https://github.com/ikegami-yukino/mecab/releases/tag/v0.996.2][MeCab 0.996 64bit (ikegami-yukino)]]
+
+Reference: [[https://qiita.com/smiler5617/items/0744c256841875824ed2][PythonでMeCabを使う際のメモ]]
+
+** Install mecab-skkserv dictionary
+
+The mecab-skkserv dictionary provides SKK-aware conversion rules for
+MeCab.  Download from:
+
+- [[http://chasen.org/~taku/software/mecab-skkserv/][mecab-skkserv — MeCab を使ってかな漢字変換]]
+
+After downloading =mecab-skkserv-0.03.tar.gz=:
+
+#+begin_src sh
+tar xzf mecab-skkserv-0.03.tar.gz
+cd mecab-skkserv-0.03
+
+# Convert dictionary from EUC-JP to UTF-8
+iconv -f EUC-JP -t UTF-8 dic.csv > dic_utf8.csv
+mv dic_utf8.csv dic.csv
+#+end_src
+
+Then edit =dicrc= and add the following line at the top:
+
+#+begin_example
+config-charset = UTF-8
+#+end_example
+
+** Configuration
+
+#+begin_src emacs-lisp
+(setq mecab-server-host "127.0.0.1")
+(setq mecab-server-port 56000)
+(setq mecab-server-dict-encoding 'utf-8)
+(setq mecab-server-coding-system 'utf-8)
+
+;; MeCab executable path (OS-specific)
+(setq mecab-server-cmd
+      (cond ((eq system-type 'gnu/linux)  "/usr/bin/mecab")
+            ((eq system-type 'darwin)     "/opt/homebrew/bin/mecab")
+            ((eq system-type 'windows-nt) "C:/Program Files/MeCab/bin/mecab.exe")))
+
+;; Path to mecab-skkserv dictionary directory
+(setq mecab-server-dict-dir
+      (expand-file-name "~/path/to/mecab-skkserv-0.03"))
+
+(mecab-server-start)
+#+end_src
+
+* Google IME setup
+
+No installation needed.  Google IME uses the public Google
+transliteration API over HTTPS.  Results are cached to disk for
+offline use.
+
+#+begin_src emacs-lisp
+(setq google-ime-server-host "127.0.0.1")
+(setq google-ime-server-port 55000)
+(google-ime-server-start)
+#+end_src
+
+* Full startup example
+
+#+begin_src emacs-lisp
+(require 'emacs-skkserv)
+
+;; 1. Dictionary server
+(setq dictionary-server-host "127.0.0.1")
+(setq dictionary-server-port 54000)
+(setq dictionary-server-debug nil)
+(setq skk-async-dictionaries
+      `((:file ,(expand-file-name "~/.emacs.d/ddskk/SKK-JISYO.L.utf8")
+               :type plain :coding utf-8)))
+(dictionary-server-start)
+
+;; 2. Google IME server
+(setq google-ime-server-host "127.0.0.1")
+(setq google-ime-server-port 55000)
+(setq google-ime-debug nil)
+(google-ime-server-start)
+
+;; 3. MeCab server (optional)
+(setq mecab-server-host "127.0.0.1")
+(setq mecab-server-port 56000)
+(setq mecab-server-cmd "/usr/bin/mecab")
+(setq mecab-server-dict-dir "~/path/to/mecab-skkserv-0.03")
+(setq mecab-server-dict-encoding 'utf-8)
+(setq mecab-server-coding-system 'utf-8)
+(mecab-server-start)
+
+;; 4. Main SKK server (connects to the above)
+(setq skk-async-server-port 1178)
+(setq skk-async-use-google-ime t)
+(setq skk-async-use-mecab t)
+(setq skk-async-debug nil)
+(skk-async-server-start)
+#+end_src
+
+* Related projects
+
+- [[https://github.com/uasi/yaskkserv2][yaskkserv2]] — Rust implementation of skkserv
+- [[https://ddskk.readthedocs.io/][ddskk]] — Emacs SKK input method
+- [[https://github.com/nathancorvussolis/corvusskk][CorvusSKK]] — Windows system-wide SKK
+- [[http://chasen.org/~taku/software/mecab-skkserv/][mecab-skkserv]] — Original MeCab-based SKK conversion
+
+* License
+
+GPL-3.0
