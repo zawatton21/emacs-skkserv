@@ -1,0 +1,296 @@
+#+title: emacs-skkserv — Emacs Lisp による SKK 辞書サーバ
+#+author: 藤澤電気管理事務所
+
+*言語:* [[file:README.org][English]] / 日本語
+
+#+begin_quote
+Google IME と MeCab バックエンドを備えた、Emacs Lisp によるフル skkserv 実装。
+#+end_quote
+
+#+html: <a href="https://github.com/sponsors/zawatton21"><img src="https://img.shields.io/badge/Sponsor_%E2%9D%A4_Support_this_project-pink?style=for-the-badge" alt="Sponsor"></a>
+
+* これは何？
+
+emacs-skkserv は Emacs 内部で動作する SKK 辞書サーバです。
+標準の skkserv プロトコルをポート 1178 で話すため、あらゆる SKK
+クライアントから接続できます:
+
+- *ddskk*（Emacs 組み込み SKK）
+- *CorvusSKK*（Windows システム全体の SKK）
+- *ibus-skk*（Linux IBus SKK）
+
+yaskkserv や skkserv などのスタンドアロン実装と異なり、
+emacs-skkserv は Emacs のネットワークプロセスとして動作します。
+外部デーモンを別途管理する必要はありません。
+
+* アーキテクチャ
+
+#+begin_example
+  SKK クライアント (ddskk / CorvusSKK / ibus-skk)
+       │
+       │  skkserv プロトコル（ポート 1178）
+       ▼
+  ┌─────────────────────┐
+  │  skk-async-server   │  ← skkserv プロトコルハンドラ
+  │  （トライキャッシュ）│
+  └─────┬───┬───┬───────┘
+        │   │   │
+   ┌────┘   │   └────┐
+   ▼        ▼        ▼
+ 辞書        Google   MeCab
+ サーバ      IME      サーバ
+（ポート     サーバ  （ポート
+  54000）  （ポート    56000）
+            55000）
+#+end_example
+
+3 つのバックエンドはすべて並行して動作します。クエリが届くと:
+
+1. 辞書サーバがまずローカルの SKK 辞書ファイルを検索
+2. Google IME と MeCab がオンライン時に並行してレース
+3. 結果をマージしてクライアントに返答
+
+* 機能
+
+| 機能 | 説明 |
+|------+------|
+| skkserv プロトコル | 標準プロトコル対応。どの SKK クライアントでも動作 |
+| 複数辞書形式対応 | プレーンテキスト、CDB、SQLite |
+| トライキャッシュ | インメモリトライによるミリ秒以下の高速検索 |
+| Google IME フォールバック | オンライン変換 + 永続ディスクキャッシュ |
+| MeCab 連携 | 複合語変換のための形態素解析 |
+| オンライン対応 | オフライン時は辞書のみモードに自動切替 |
+| 非同期 I/O | ノンブロッキングネットワーク処理、Emacs がフリーズしない |
+
+* 必要環境
+
+- Emacs 27.1+
+- [[https://melpa.org/#/async][async.el]]
+- SKK 辞書ファイル（[[*SKK 辞書のセットアップ][SKK 辞書のセットアップ]] を参照）
+- MeCab（任意、[[*MeCab のセットアップ][MeCab のセットアップ]] を参照）
+
+* インストール
+
+** async-installer
+
+[[https://github.com/zawatton21/async-installer][async-installer]] — Emacs 用の小型ノンブロッキングパッケージマネージャ。純粋な Elisp 構文 — マクロ DSL 不要。
+
+#+begin_src emacs-lisp
+(async-installer-git-add "https://github.com/zawatton21/emacs-skkserv.git"
+                            :branch "master"
+                            :main "emacs-skkserv.el")
+#+end_src
+
+** straight.el
+
+#+begin_src emacs-lisp
+(straight-use-package
+ '(emacs-skkserv :type git :host github :repo "zawatton21/emacs-skkserv"))
+#+end_src
+
+** elpaca
+
+#+begin_src emacs-lisp
+(elpaca (emacs-skkserv :host github :repo "zawatton21/emacs-skkserv"))
+#+end_src
+
+** use-package（straight または elpaca と併用）
+
+#+begin_src emacs-lisp
+;; straight の場合
+(use-package emacs-skkserv
+  :straight (emacs-skkserv :type git :host github :repo "zawatton21/emacs-skkserv"))
+
+;; elpaca の場合
+(use-package emacs-skkserv
+  :ensure (:host github :repo "zawatton21/emacs-skkserv"))
+#+end_src
+
+** 手動インストール
+
+リポジトリをクローンして =load-path= に追加:
+
+#+begin_src emacs-lisp
+(add-to-list 'load-path "/path/to/emacs-skkserv")
+(require 'emacs-skkserv)
+#+end_src
+
+* SKK 辞書のセットアップ
+
+emacs-skkserv には SKK 辞書ファイルが最低 1 つ必要です。
+最も一般的な選択は =SKK-JISYO.L=（大辞書、約 17 万エントリ）です。
+
+** ダウンロード
+
+#+begin_src sh
+# SKK OpenLab からダウンロード
+curl -O https://skk-dev.github.io/dict/SKK-JISYO.L.gz
+gunzip SKK-JISYO.L.gz
+#+end_src
+
+標準配布版は EUC-JP エンコードです。UTF-8 に変換してください:
+
+#+begin_src sh
+iconv -f EUC-JP -t UTF-8 SKK-JISYO.L > SKK-JISYO.L.utf8
+#+end_src
+
+適当な場所に配置してください（例: =~/.emacs.d/ddskk/=）。
+
+** 対応辞書形式
+
+| 形式 | 拡張子 | 説明 |
+|------+--------+------|
+| プレーンテキスト | =.utf8= | 標準 SKK 辞書形式。追加ツール不要。 |
+| CDB | =.cdb= | Constant Database。大辞書の高速検索向き。 |
+| SQLite | =.db= | SQLite3 データベース。複雑なクエリに対応。 |
+
+** 設定
+
+#+begin_src emacs-lisp
+(setq dictionary-server-host "127.0.0.1")
+(setq dictionary-server-port 54000)
+(setq skk-async-dictionaries
+      `(;; プレーンテキスト辞書
+        (:file ,(expand-file-name "~/.emacs.d/ddskk/SKK-JISYO.L.utf8")
+               :type plain :coding utf-8)
+        ;; ユーザ辞書（任意）
+        (:file ,(expand-file-name "~/.emacs.d/ddskk/SKK-MY-JISYO.utf8")
+               :type plain :coding utf-8)))
+(dictionary-server-start)
+#+end_src
+
+* MeCab のセットアップ
+
+MeCab は複合語変換のための形態素解析を提供します。
+任意コンポーネントです — emacs-skkserv は MeCab なしでも動作します
+（辞書 + Google IME のみ）。
+
+** MeCab のインストール
+
+*** Linux（Debian / Ubuntu / WSL）
+
+#+begin_src sh
+sudo apt install mecab libmecab-dev mecab-ipadic-utf8
+#+end_src
+
+参考: [[https://zenn.dev/splusl_at/articles/mecab-install-wsl][WSLのUbuntuにMeCabをインストールする]]
+
+*** macOS
+
+#+begin_src sh
+brew install mecab mecab-ipadic
+#+end_src
+
+参考: [[https://shishimaro.co.jp/blog/ai/489][MacでMeCabのPython開発環境を構築する]]
+
+*** Windows
+
+64bit 非公式ビルドを使用:
+
+- [[https://github.com/ikegami-yukino/mecab/releases/tag/v0.996.2][MeCab 0.996 64bit (ikegami-yukino)]]
+
+参考: [[https://qiita.com/smiler5617/articles/0744c256841875824ed2][PythonでMeCabを使う際のメモ]]
+
+** mecab-skkserv 辞書のインストール
+
+mecab-skkserv 辞書は MeCab 用の SKK 対応変換ルールを提供します。
+以下からダウンロード:
+
+- [[http://chasen.org/~taku/software/mecab-skkserv/][mecab-skkserv — MeCab を使ってかな漢字変換]]
+
+=mecab-skkserv-0.03.tar.gz= をダウンロード後:
+
+#+begin_src sh
+tar xzf mecab-skkserv-0.03.tar.gz
+cd mecab-skkserv-0.03
+
+# 辞書を EUC-JP から UTF-8 に変換
+iconv -f EUC-JP -t UTF-8 dic.csv > dic_utf8.csv
+mv dic_utf8.csv dic.csv
+#+end_src
+
+次に =dicrc= を編集し、先頭に以下の行を追加:
+
+#+begin_example
+config-charset = UTF-8
+#+end_example
+
+** 設定
+
+#+begin_src emacs-lisp
+(setq mecab-server-host "127.0.0.1")
+(setq mecab-server-port 56000)
+(setq mecab-server-dict-encoding 'utf-8)
+(setq mecab-server-coding-system 'utf-8)
+
+;; MeCab 実行ファイルパス（OS 別）
+(setq mecab-server-cmd
+      (cond ((eq system-type 'gnu/linux)  "/usr/bin/mecab")
+            ((eq system-type 'darwin)     "/opt/homebrew/bin/mecab")
+            ((eq system-type 'windows-nt) "C:/Program Files/MeCab/bin/mecab.exe")))
+
+;; mecab-skkserv 辞書ディレクトリのパス
+(setq mecab-server-dict-dir
+      (expand-file-name "~/path/to/mecab-skkserv-0.03"))
+
+(mecab-server-start)
+#+end_src
+
+* Google IME のセットアップ
+
+インストール不要です。Google IME は HTTPS 経由で Google の公開
+翻字 API を使用します。結果はオフライン利用のためディスクにキャッシュされます。
+
+#+begin_src emacs-lisp
+(setq google-ime-server-host "127.0.0.1")
+(setq google-ime-server-port 55000)
+(google-ime-server-start)
+#+end_src
+
+* フル起動サンプル
+
+#+begin_src emacs-lisp
+(require 'emacs-skkserv)
+
+;; 1. 辞書サーバ
+(setq dictionary-server-host "127.0.0.1")
+(setq dictionary-server-port 54000)
+(setq dictionary-server-debug nil)
+(setq skk-async-dictionaries
+      `((:file ,(expand-file-name "~/.emacs.d/ddskk/SKK-JISYO.L.utf8")
+               :type plain :coding utf-8)))
+(dictionary-server-start)
+
+;; 2. Google IME サーバ
+(setq google-ime-server-host "127.0.0.1")
+(setq google-ime-server-port 55000)
+(setq google-ime-debug nil)
+(google-ime-server-start)
+
+;; 3. MeCab サーバ（任意）
+(setq mecab-server-host "127.0.0.1")
+(setq mecab-server-port 56000)
+(setq mecab-server-cmd "/usr/bin/mecab")
+(setq mecab-server-dict-dir "~/path/to/mecab-skkserv-0.03")
+(setq mecab-server-dict-encoding 'utf-8)
+(setq mecab-server-coding-system 'utf-8)
+(mecab-server-start)
+
+;; 4. メイン SKK サーバ（上記に接続）
+(setq skk-async-server-port 1178)
+(setq skk-async-use-google-ime t)
+(setq skk-async-use-mecab t)
+(setq skk-async-debug nil)
+(skk-async-server-start)
+#+end_src
+
+* 関連プロジェクト
+
+- [[https://github.com/uasi/yaskkserv2][yaskkserv2]] — Rust による skkserv 実装
+- [[https://ddskk.readthedocs.io/][ddskk]] — Emacs SKK 入力メソッド
+- [[https://github.com/nathancorvussolis/corvusskk][CorvusSKK]] — Windows システム全体で使える SKK
+- [[http://chasen.org/~taku/software/mecab-skkserv/][mecab-skkserv]] — MeCab を使ったオリジナルの SKK 変換
+
+* ライセンス
+
+GPL-3.0

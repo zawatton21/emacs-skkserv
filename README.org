@@ -1,6 +1,8 @@
 #+title: emacs-skkserv — SKK dictionary server in Emacs Lisp
 #+author: Fujisawa Electric Management Office
 
+*Languages:* English / [[file:README.ja.org][日本語]]
+
 #+begin_quote
 A full skkserv implementation in Emacs Lisp with Google IME and MeCab backends.
 #+end_quote
@@ -20,6 +22,12 @@ client can connect:
 Unlike standalone skkserv implementations (yaskkserv, skkserv),
 emacs-skkserv runs as Emacs network processes — no external daemon
 to manage.
+
+*SKK* (Simple Kana to Kanji conversion program) is a Japanese input
+method that converts hiragana (kana, 仮名) to kanji (漢字) characters,
+handling features such as okurigana (送り仮名, trailing kana suffixes
+that change with verb conjugation).  A *skkserv* is a network server
+that SKK clients query for dictionary lookups.
 
 * Architecture
 
@@ -171,7 +179,7 @@ Google IME only).
 sudo apt install mecab libmecab-dev mecab-ipadic-utf8
 #+end_src
 
-Reference: [[https://zenn.dev/splusl_at/articles/mecab-install-wsl][WSLのUbuntuにMeCabをインストールする]]
+Reference: [[https://zenn.dev/splusl_at/articles/mecab-install-wsl][Installing MeCab on Ubuntu in WSL]]
 
 *** macOS
 
@@ -179,7 +187,7 @@ Reference: [[https://zenn.dev/splusl_at/articles/mecab-install-wsl][WSLのUbuntu
 brew install mecab mecab-ipadic
 #+end_src
 
-Reference: [[https://shishimaro.co.jp/blog/ai/489][MacでMeCabのPython開発環境を構築する]]
+Reference: [[https://shishimaro.co.jp/blog/ai/489][Setting up a MeCab Python development environment on Mac]]
 
 *** Windows
 
@@ -187,14 +195,14 @@ Use the 64-bit unofficial build:
 
 - [[https://github.com/ikegami-yukino/mecab/releases/tag/v0.996.2][MeCab 0.996 64bit (ikegami-yukino)]]
 
-Reference: [[https://qiita.com/smiler5617/items/0744c256841875824ed2][PythonでMeCabを使う際のメモ]]
+Reference: [[https://qiita.com/smiler5617/articles/0744c256841875824ed2][Notes on using MeCab with Python]]
 
 ** Install mecab-skkserv dictionary
 
 The mecab-skkserv dictionary provides SKK-aware conversion rules for
 MeCab.  Download from:
 
-- [[http://chasen.org/~taku/software/mecab-skkserv/][mecab-skkserv — MeCab を使ってかな漢字変換]]
+- [[http://chasen.org/~taku/software/mecab-skkserv/][mecab-skkserv — kana-kanji conversion using MeCab]]
 
 After downloading =mecab-skkserv-0.03.tar.gz=:
 
