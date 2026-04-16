@@ -1,7 +1,7 @@
 ;;; emacs-skkserv.el --- SKK dictionary server implemented in Emacs Lisp -*- lexical-binding: t; -*-
 
 ;; Author: Fujisawa Electric Management Office
-;; URL: https://github.com/zawatton21/emacs-skkserv
+;; URL: https://github.com/zawatton/emacs-skkserv
 ;; Version: 0.1.0
 ;; Keywords: i18n, japanese, input-method
 ;; Package-Requires: ((emacs "27.1") (async "1.9"))

@@ -7,7 +7,7 @@
 A full skkserv implementation in Emacs Lisp with Google IME and MeCab backends.
 #+end_quote
 
-#+html: <a href="https://github.com/sponsors/zawatton21"><img src="https://img.shields.io/badge/Sponsor_%E2%9D%A4_Support_this_project-pink?style=for-the-badge" alt="Sponsor"></a>
+#+html: <a href="https://github.com/sponsors/zawatton"><img src="https://img.shields.io/badge/Sponsor_%E2%9D%A4_Support_this_project-pink?style=for-the-badge" alt="Sponsor"></a>
 
 * What is this?
 
@@ -79,10 +79,10 @@ All three backends run concurrently.  When a query arrives:
 
 ** async-installer
 
-[[https://github.com/zawatton21/async-installer][async-installer]] — a small, non-blocking package manager for Emacs. Pure Elisp syntax — no macro DSL required.
+[[https://github.com/zawatton/async-installer][async-installer]] — a small, non-blocking package manager for Emacs. Pure Elisp syntax — no macro DSL required.
 
 #+begin_src emacs-lisp
-(async-installer-git-add "https://github.com/zawatton21/emacs-skkserv.git"
+(async-installer-git-add "https://github.com/zawatton/emacs-skkserv.git"
                             :branch "master"
                             :main "emacs-skkserv.el")
 #+end_src
@@ -91,13 +91,13 @@ All three backends run concurrently.  When a query arrives:
 
 #+begin_src emacs-lisp
 (straight-use-package
- '(emacs-skkserv :type git :host github :repo "zawatton21/emacs-skkserv"))
+ '(emacs-skkserv :type git :host github :repo "zawatton/emacs-skkserv"))
 #+end_src
 
 ** elpaca
 
 #+begin_src emacs-lisp
-(elpaca (emacs-skkserv :host github :repo "zawatton21/emacs-skkserv"))
+(elpaca (emacs-skkserv :host github :repo "zawatton/emacs-skkserv"))
 #+end_src
 
 ** use-package (with straight or elpaca)
@@ -105,11 +105,11 @@ All three backends run concurrently.  When a query arrives:
 #+begin_src emacs-lisp
 ;; with straight
 (use-package emacs-skkserv
-  :straight (emacs-skkserv :type git :host github :repo "zawatton21/emacs-skkserv"))
+  :straight (emacs-skkserv :type git :host github :repo "zawatton/emacs-skkserv"))
 
 ;; with elpaca
 (use-package emacs-skkserv
-  :ensure (:host github :repo "zawatton21/emacs-skkserv"))
+  :ensure (:host github :repo "zawatton/emacs-skkserv"))
 #+end_src
 
 ** Manual
